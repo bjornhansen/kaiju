@@ -11,7 +11,7 @@ swift test           # Run all 49 tests
 
 - **Swift Package** (swift-tools-version 5.9, macOS 14+)
 - **Dependencies**: GRDB.swift (SQLite), KeychainAccess (secure storage)
-- **Product**: `KaijuLib` library target
+- **Target**: `Kaiju` executable target (tests can depend on it since Swift 5.4)
 - `Sources/Kaiju/` — main source code
 - `Tests/KaijuTests/` — test suite
 
@@ -19,7 +19,7 @@ swift test           # Run all 49 tests
 
 | Directory | Purpose |
 |-----------|---------|
-| `App/` | SwiftUI app entry point + AppState (excluded from library target to avoid `@main` linker conflict in tests) |
+| `App/` | SwiftUI `@main` app entry point + AppState |
 | `Auth/` | OAuth 2.0 (3LO) with Atlassian |
 | `API/` | JiraAPIClient, endpoints, rate limiter, API models |
 | `Store/` | GRDB-backed local SQLite store, schema, migrations |
