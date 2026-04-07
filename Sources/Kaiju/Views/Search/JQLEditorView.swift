@@ -61,7 +61,7 @@ struct JQLEditorView: View {
         HStack {
             Text(jql)
                 .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.tint)
             Spacer()
             Text(description)
                 .font(.caption)

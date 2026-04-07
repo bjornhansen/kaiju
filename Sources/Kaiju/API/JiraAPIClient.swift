@@ -140,9 +140,7 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
         let (data, response) = try await rateLimiter.execute(request: request, session: session)
 
         guard (200...299).contains(response.statusCode) else {
-            let message = String(data: data, encoding: .utf8)
             throw JiraAPIError.httpError(statusCode: response.statusCode, data: data)
-            _ = message  // suppress unused warning
         }
     }
 

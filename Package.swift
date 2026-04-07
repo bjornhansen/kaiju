@@ -21,7 +21,8 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
                 "KeychainAccess",
             ],
-            path: "Sources/Kaiju"
+            path: "Sources/Kaiju",
+            exclude: ["App/KaijuApp.swift"]
         ),
         .testTarget(
             name: "KaijuTests",

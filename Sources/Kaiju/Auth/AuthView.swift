@@ -16,7 +16,7 @@ struct AuthView: View {
             VStack(spacing: 12) {
                 Image(systemName: "lizard.fill")
                     .font(.system(size: 64))
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(.tint)
 
                 Text("Kaiju")
                     .font(.largeTitle)

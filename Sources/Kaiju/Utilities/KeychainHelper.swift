@@ -1,5 +1,5 @@
 import Foundation
-import KeychainAccess
+@preconcurrency import KeychainAccess
 
 /// Protocol for keychain operations, enabling test mocking
 protocol KeychainHelperProtocol: Sendable {

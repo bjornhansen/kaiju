@@ -108,11 +108,13 @@ final class SchemaTests: XCTestCase {
             try await store.saveNotification(notification)
         }
 
-        XCTAssertEqual(try await store.unreadNotificationCount(), 3)
+        let unreadBefore = try await store.unreadNotificationCount()
+        XCTAssertEqual(unreadBefore, 3)
 
         try await store.markAllNotificationsRead()
 
-        XCTAssertEqual(try await store.unreadNotificationCount(), 0)
+        let unreadAfter = try await store.unreadNotificationCount()
+        XCTAssertEqual(unreadAfter, 0)
     }
 
     func test_save_and_retrieve_projects() async throws {
@@ -163,10 +165,12 @@ final class SchemaTests: XCTestCase {
         let store = try LocalStore()
 
         try await store.saveIssue(makeTestIssue(key: "KAI-1"))
-        XCTAssertNotNil(try await store.issue(byKey: "KAI-1"))
+        let saved = try await store.issue(byKey: "KAI-1")
+        XCTAssertNotNil(saved)
 
         try await store.deleteIssue(byKey: "KAI-1")
-        XCTAssertNil(try await store.issue(byKey: "KAI-1"))
+        let deleted = try await store.issue(byKey: "KAI-1")
+        XCTAssertNil(deleted)
     }
 
     func test_clear_all_data() async throws {

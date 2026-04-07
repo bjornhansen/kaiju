@@ -101,8 +101,9 @@ final class IssueDetailViewModel {
         issue?.assigneeAccountId = accountId
 
         do {
+            let assigneeValue: Any = accountId != nil ? ["accountId": accountId!] as [String: String] : NSNull()
             let body: [String: Any] = [
-                "fields": ["assignee": accountId != nil ? ["accountId": accountId!] : NSNull()]
+                "fields": ["assignee": assigneeValue]
             ]
             let data = try JSONSerialization.data(withJSONObject: body)
             try await apiClient.updateIssue(key: key, body: data)

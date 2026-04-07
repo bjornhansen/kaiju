@@ -93,7 +93,7 @@ actor SyncEngine {
 
     private func syncBoard(boardId: Int) async throws {
         let scopeKey = "board_\(boardId)"
-        let lastSync = try await store.syncState(forScope: scopeKey)
+        _ = try await store.syncState(forScope: scopeKey)
 
         // Fetch board issues with pagination
         var allIssues: [APIIssue] = []
