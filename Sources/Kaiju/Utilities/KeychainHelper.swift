@@ -36,12 +36,9 @@ final class KeychainHelper: KeychainHelperProtocol, Sendable {
 
 /// Keys used for keychain storage
 enum KeychainKeys {
-    static let accessToken = "kaiju_access_token"
-    static let refreshToken = "kaiju_refresh_token"
-    static let tokenExpiry = "kaiju_token_expiry"
-    static let cloudId = "kaiju_cloud_id"
-    static let siteName = "kaiju_site_name"
     static let siteUrl = "kaiju_site_url"
+    static let email = "kaiju_email"
+    static let apiToken = "kaiju_api_token"
 }
 
 /// In-memory keychain implementation for testing

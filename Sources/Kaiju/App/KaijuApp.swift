@@ -48,21 +48,16 @@ struct ContentView: View {
             case .signedOut, .error:
                 AuthView(authManager: appState.authManager)
 
-            case .signingIn, .refreshingToken:
+            case .signingIn:
                 VStack {
                     ProgressView("Connecting to Jira...")
-                    if case .error(let msg) = appState.authManager.state {
-                        Text(msg)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            case .authenticated(let cloudId, let siteName):
+            case .authenticated(_, let siteName):
                 MainAppView(appState: appState, siteName: siteName)
                     .task {
-                        await appState.startServices(cloudId: cloudId)
+                        await appState.startServices()
                     }
             }
         }

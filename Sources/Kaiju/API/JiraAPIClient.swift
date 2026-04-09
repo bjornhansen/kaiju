@@ -13,11 +13,6 @@ enum JiraAPIError: Error, Sendable {
 
 /// Protocol for the Jira API client, enabling mocking in tests
 protocol JiraAPIClientProtocol: Sendable {
-    // MARK: - Auth
-    func fetchAccessibleResources(accessToken: String) async throws -> [APIAccessibleResource]
-    func exchangeCodeForTokens(code: String, clientId: String, clientSecret: String, redirectURI: String) async throws -> APIOAuthTokenResponse
-    func refreshTokens(refreshToken: String, clientId: String, clientSecret: String) async throws -> APIOAuthTokenResponse
-
     // MARK: - Current User
     func fetchMyself() async throws -> APIUser
 
@@ -55,17 +50,17 @@ protocol JiraAPIClientProtocol: Sendable {
     func refreshWebhooks(webhookIds: [Int]) async throws
 }
 
-/// Live Jira API client using URLSession
+/// Live Jira API client using URLSession with Basic auth (API token)
 final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     private let rateLimiter: RateLimiter
     private let session: URLSession
     private let logger = Logger(subsystem: "com.kaiju.app", category: "JiraAPIClient")
 
-    /// Cloud ID for the connected Jira site. Set after OAuth completes.
-    var cloudId: String?
+    /// Site URL for the connected Jira instance (e.g. "https://mysite.atlassian.net")
+    var siteURL: String?
 
-    /// Closure to get current access token. Set by AuthManager.
-    var accessTokenProvider: (@Sendable () async throws -> String)?
+    /// Base64-encoded "email:apiToken" for Basic auth. Set by AuthManager.
+    var authHeader: String?
 
     init(
         rateLimiter: RateLimiter = RateLimiter(),
@@ -80,26 +75,21 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     private func makeRequest(
         url urlString: String,
         method: String = "GET",
-        body: Data? = nil,
-        requiresAuth: Bool = true
+        body: Data? = nil
     ) async throws -> URLRequest {
         guard let url = URL(string: urlString) else {
             throw JiraAPIError.invalidURL(urlString)
+        }
+
+        guard let auth = authHeader else {
+            throw JiraAPIError.notAuthenticated
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        if requiresAuth {
-            guard let provider = accessTokenProvider else {
-                throw JiraAPIError.notAuthenticated
-            }
-            let token = try await provider()
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
+        request.setValue("Basic \(auth)", forHTTPHeaderField: "Authorization")
         request.httpBody = body
         return request
     }
@@ -107,16 +97,9 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     private func performRequest<T: Decodable>(
         url: String,
         method: String = "GET",
-        body: Data? = nil,
-        requiresAuth: Bool = true
+        body: Data? = nil
     ) async throws -> T {
-        let request = try await makeRequest(
-            url: url,
-            method: method,
-            body: body,
-            requiresAuth: requiresAuth
-        )
-
+        let request = try await makeRequest(url: url, method: method, body: body)
         let (data, response) = try await rateLimiter.execute(request: request, session: session)
 
         guard (200...299).contains(response.statusCode) else {
@@ -144,95 +127,37 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
         }
     }
 
-    private func requireCloudId() throws -> String {
-        guard let cloudId = cloudId else {
+    private func requireSiteURL() throws -> String {
+        guard let siteURL = siteURL else {
             throw JiraAPIError.notAuthenticated
         }
-        return cloudId
-    }
-
-    // MARK: - Auth
-
-    func fetchAccessibleResources(accessToken: String) async throws -> [APIAccessibleResource] {
-        var request = URLRequest(url: URL(string: JiraEndpoints.accessibleResources)!)
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        let (data, response) = try await rateLimiter.execute(request: request, session: session)
-        guard (200...299).contains(response.statusCode) else {
-            throw JiraAPIError.httpError(statusCode: response.statusCode, data: data)
-        }
-        return try JSONDecoder().decode([APIAccessibleResource].self, from: data)
-    }
-
-    func exchangeCodeForTokens(
-        code: String,
-        clientId: String,
-        clientSecret: String,
-        redirectURI: String
-    ) async throws -> APIOAuthTokenResponse {
-        let body: [String: String] = [
-            "grant_type": "authorization_code",
-            "client_id": clientId,
-            "client_secret": clientSecret,
-            "code": code,
-            "redirect_uri": redirectURI,
-        ]
-        let bodyData = try JSONEncoder().encode(body)
-
-        return try await performRequest(
-            url: JiraEndpoints.tokenEndpoint,
-            method: "POST",
-            body: bodyData,
-            requiresAuth: false
-        )
-    }
-
-    func refreshTokens(
-        refreshToken: String,
-        clientId: String,
-        clientSecret: String
-    ) async throws -> APIOAuthTokenResponse {
-        let body: [String: String] = [
-            "grant_type": "refresh_token",
-            "client_id": clientId,
-            "client_secret": clientSecret,
-            "refresh_token": refreshToken,
-        ]
-        let bodyData = try JSONEncoder().encode(body)
-
-        return try await performRequest(
-            url: JiraEndpoints.tokenEndpoint,
-            method: "POST",
-            body: bodyData,
-            requiresAuth: false
-        )
+        return siteURL
     }
 
     // MARK: - Current User
 
     func fetchMyself() async throws -> APIUser {
-        let cid = try requireCloudId()
-        return try await performRequest(url: JiraEndpoints.myself(cloudId: cid))
+        let site = try requireSiteURL()
+        return try await performRequest(url: JiraEndpoints.myself(siteURL: site))
     }
 
     // MARK: - Projects
 
     func fetchProjects() async throws -> [APIProject] {
-        let cid = try requireCloudId()
-        return try await performRequest(url: JiraEndpoints.projects(cloudId: cid))
+        let site = try requireSiteURL()
+        return try await performRequest(url: JiraEndpoints.projects(siteURL: site))
     }
 
     func fetchRecentProjects() async throws -> [APIProject] {
-        let cid = try requireCloudId()
-        return try await performRequest(url: JiraEndpoints.recentProjects(cloudId: cid))
+        let site = try requireSiteURL()
+        return try await performRequest(url: JiraEndpoints.recentProjects(siteURL: site))
     }
 
     // MARK: - Boards
 
     func fetchBoards(projectKey: String?) async throws -> [APIBoard] {
-        let cid = try requireCloudId()
-        var urlString = JiraEndpoints.boards(cloudId: cid)
+        let site = try requireSiteURL()
+        var urlString = JiraEndpoints.boards(siteURL: site)
         if let pk = projectKey {
             urlString += "?projectKeyOrId=\(pk)"
         }
@@ -241,9 +166,9 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     }
 
     func fetchBoardConfiguration(boardId: Int) async throws -> APIBoardConfiguration {
-        let cid = try requireCloudId()
+        let site = try requireSiteURL()
         return try await performRequest(
-            url: JiraEndpoints.boardConfiguration(cloudId: cid, boardId: boardId)
+            url: JiraEndpoints.boardConfiguration(siteURL: site, boardId: boardId)
         )
     }
 
@@ -253,8 +178,8 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
         maxResults: Int = 50,
         fields: String? = nil
     ) async throws -> APIBoardIssueList {
-        let cid = try requireCloudId()
-        var urlString = JiraEndpoints.boardIssues(cloudId: cid, boardId: boardId)
+        let site = try requireSiteURL()
+        var urlString = JiraEndpoints.boardIssues(siteURL: site, boardId: boardId)
         urlString += "?startAt=\(startAt)&maxResults=\(maxResults)"
         if let f = fields {
             urlString += "&fields=\(f)"
@@ -265,8 +190,8 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     // MARK: - Issues
 
     func fetchIssue(key: String, fields: String? = nil) async throws -> APIIssue {
-        let cid = try requireCloudId()
-        var urlString = JiraEndpoints.issue(cloudId: cid, key: key)
+        let site = try requireSiteURL()
+        var urlString = JiraEndpoints.issue(siteURL: site, key: key)
         if let f = fields {
             urlString += "?fields=\(f)"
         }
@@ -274,36 +199,36 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     }
 
     func createIssue(body: Data) async throws -> APIIssue {
-        let cid = try requireCloudId()
+        let site = try requireSiteURL()
         return try await performRequest(
-            url: JiraEndpoints.createIssue(cloudId: cid),
+            url: JiraEndpoints.createIssue(siteURL: site),
             method: "POST",
             body: body
         )
     }
 
     func updateIssue(key: String, body: Data) async throws {
-        let cid = try requireCloudId()
+        let site = try requireSiteURL()
         try await performVoidRequest(
-            url: JiraEndpoints.issue(cloudId: cid, key: key),
+            url: JiraEndpoints.issue(siteURL: site, key: key),
             method: "PUT",
             body: body
         )
     }
 
     func fetchTransitions(issueKey: String) async throws -> [APITransition] {
-        let cid = try requireCloudId()
+        let site = try requireSiteURL()
         let result: APITransitionList = try await performRequest(
-            url: JiraEndpoints.transitions(cloudId: cid, issueKey: issueKey)
+            url: JiraEndpoints.transitions(siteURL: site, issueKey: issueKey)
         )
         return result.transitions
     }
 
     func performTransition(issueKey: String, transitionId: String) async throws {
-        let cid = try requireCloudId()
+        let site = try requireSiteURL()
         let body = try JSONEncoder().encode(["transition": ["id": transitionId]])
         try await performVoidRequest(
-            url: JiraEndpoints.transitions(cloudId: cid, issueKey: issueKey),
+            url: JiraEndpoints.transitions(siteURL: site, issueKey: issueKey),
             method: "POST",
             body: body
         )
@@ -316,17 +241,17 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
         startAt: Int = 0,
         maxResults: Int = 50
     ) async throws -> APICommentPage {
-        let cid = try requireCloudId()
-        let urlString = JiraEndpoints.comments(cloudId: cid, issueKey: issueKey)
+        let site = try requireSiteURL()
+        let urlString = JiraEndpoints.comments(siteURL: site, issueKey: issueKey)
             + "?startAt=\(startAt)&maxResults=\(maxResults)"
         return try await performRequest(url: urlString)
     }
 
     func addComment(issueKey: String, body: ADFDocument) async throws -> APIComment {
-        let cid = try requireCloudId()
+        let site = try requireSiteURL()
         let requestBody = try JSONEncoder().encode(["body": body])
         return try await performRequest(
-            url: JiraEndpoints.comments(cloudId: cid, issueKey: issueKey),
+            url: JiraEndpoints.comments(siteURL: site, issueKey: issueKey),
             method: "POST",
             body: requestBody
         )
@@ -340,8 +265,8 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
         maxResults: Int = 50,
         fields: String? = nil
     ) async throws -> APISearchResult {
-        let cid = try requireCloudId()
-        let urlString = JiraEndpoints.searchJQL(cloudId: cid)
+        let site = try requireSiteURL()
+        let urlString = JiraEndpoints.searchJQL(siteURL: site)
         var components = URLComponents(string: urlString)!
         components.queryItems = [
             URLQueryItem(name: "jql", value: jql),
@@ -357,23 +282,23 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     // MARK: - Reference Data
 
     func fetchPriorities() async throws -> [APIPriority] {
-        let cid = try requireCloudId()
-        return try await performRequest(url: JiraEndpoints.priorities(cloudId: cid))
+        let site = try requireSiteURL()
+        return try await performRequest(url: JiraEndpoints.priorities(siteURL: site))
     }
 
     func fetchStatuses() async throws -> [APIStatus] {
-        let cid = try requireCloudId()
-        return try await performRequest(url: JiraEndpoints.statuses(cloudId: cid))
+        let site = try requireSiteURL()
+        return try await performRequest(url: JiraEndpoints.statuses(siteURL: site))
     }
 
     func fetchIssueTypes() async throws -> [APIIssueType] {
-        let cid = try requireCloudId()
-        return try await performRequest(url: JiraEndpoints.issueTypes(cloudId: cid))
+        let site = try requireSiteURL()
+        return try await performRequest(url: JiraEndpoints.issueTypes(siteURL: site))
     }
 
     func fetchAssignableUsers(projectKey: String, query: String? = nil) async throws -> [APIUser] {
-        let cid = try requireCloudId()
-        var urlString = JiraEndpoints.assignableUsers(cloudId: cid) + "?project=\(projectKey)"
+        let site = try requireSiteURL()
+        var urlString = JiraEndpoints.assignableUsers(siteURL: site) + "?project=\(projectKey)"
         if let q = query {
             urlString += "&query=\(q)"
         }
@@ -383,9 +308,9 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     // MARK: - Webhooks
 
     func registerWebhooks(body: Data) async throws -> Data {
-        let cid = try requireCloudId()
+        let site = try requireSiteURL()
         let request = try await makeRequest(
-            url: JiraEndpoints.webhooks(cloudId: cid),
+            url: JiraEndpoints.webhooks(siteURL: site),
             method: "POST",
             body: body
         )
@@ -397,10 +322,10 @@ final class JiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     }
 
     func refreshWebhooks(webhookIds: [Int]) async throws {
-        let cid = try requireCloudId()
+        let site = try requireSiteURL()
         let body = try JSONEncoder().encode(["webhookIds": webhookIds])
         try await performVoidRequest(
-            url: JiraEndpoints.refreshWebhooks(cloudId: cid),
+            url: JiraEndpoints.refreshWebhooks(siteURL: site),
             method: "PUT",
             body: body
         )

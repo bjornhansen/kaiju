@@ -9,13 +9,6 @@ final class MockJiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
     var lastTransitionIssueKey: String?
     var lastTransitionId: String?
 
-    func fetchAccessibleResources(accessToken: String) async throws -> [APIAccessibleResource] { [] }
-    func exchangeCodeForTokens(code: String, clientId: String, clientSecret: String, redirectURI: String) async throws -> APIOAuthTokenResponse {
-        APIOAuthTokenResponse(access_token: "test", refresh_token: "test", expires_in: 3600, scope: nil, token_type: nil)
-    }
-    func refreshTokens(refreshToken: String, clientId: String, clientSecret: String) async throws -> APIOAuthTokenResponse {
-        APIOAuthTokenResponse(access_token: "test", refresh_token: "test", expires_in: 3600, scope: nil, token_type: nil)
-    }
     func fetchMyself() async throws -> APIUser {
         APIUser(accountId: "user-1", displayName: "Test", avatarUrls: nil, active: true, emailAddress: nil)
     }

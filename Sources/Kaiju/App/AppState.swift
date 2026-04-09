@@ -97,16 +97,11 @@ final class AppState {
         let inboxStore = NotificationInboxStore(store: store)
         self.notificationInboxVM = NotificationInboxViewModel(inboxStore: inboxStore)
 
-        // Wire up API client token provider
-        apiClient.accessTokenProvider = { [weak authManager] in
-            guard let auth = authManager else { throw JiraAPIError.notAuthenticated }
-            return try await auth.getAccessToken()
-        }
     }
 
-    /// Start background services after authentication
-    func startServices(cloudId: String) async {
-        apiClient.cloudId = cloudId
+    /// Start background services after authentication.
+    /// API client is already configured by AuthManager during sign-in.
+    func startServices() async {
 
         // Sync reference data first
         await syncEngine.requestSync(scope: .referenceData)

@@ -22,13 +22,13 @@ actor WebhookRegistrar {
     }
 
     /// Register webhooks for the given cloud ID and projects
-    func register(cloudId: String, projectKeys: [String]) async throws {
+    func register(siteId: String, projectKeys: [String]) async throws {
         let jqlFilter = projectKeys.isEmpty
             ? nil
             : "project IN (\(projectKeys.joined(separator: ", ")))"
 
         let request = WebhookRegistrationRequest(
-            url: "\(relayBaseURL)/webhook/\(cloudId)",
+            url: "\(relayBaseURL)/webhook/\(siteId)",
             webhooks: [
                 WebhookDefinition(
                     events: [

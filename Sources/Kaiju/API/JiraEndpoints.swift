@@ -1,140 +1,152 @@
 import Foundation
 
-/// Constructs Jira API URLs for all v1.0 endpoints
+/// Constructs Jira API URLs for all endpoints.
+/// Uses direct site URLs with API token auth (Basic auth).
 enum JiraEndpoints {
     /// Base URL for Jira Platform REST API v3
-    static func platformBase(cloudId: String) -> String {
-        "https://api.atlassian.com/ex/jira/\(cloudId)/rest/api/3"
+    static func platformBase(siteURL: String) -> String {
+        "\(siteURL)/rest/api/3"
     }
 
     /// Base URL for Jira Software (Agile) REST API
-    static func agileBase(cloudId: String) -> String {
-        "https://api.atlassian.com/ex/jira/\(cloudId)/rest/agile/1.0"
-    }
-
-    // MARK: - Auth / Resources
-
-    static let accessibleResources = "https://api.atlassian.com/oauth/token/accessible-resources"
-    static let tokenEndpoint = "https://auth.atlassian.com/oauth/token"
-
-    static func authorizeURL(clientId: String, redirectURI: String, state: String) -> URL? {
-        var components = URLComponents(string: "https://auth.atlassian.com/authorize")
-        components?.queryItems = [
-            URLQueryItem(name: "audience", value: "api.atlassian.com"),
-            URLQueryItem(name: "client_id", value: clientId),
-            URLQueryItem(name: "scope", value: "read:jira-work write:jira-work read:jira-user manage:jira-webhook offline_access"),
-            URLQueryItem(name: "redirect_uri", value: redirectURI),
-            URLQueryItem(name: "state", value: state),
-            URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "prompt", value: "consent"),
-        ]
-        return components?.url
+    static func agileBase(siteURL: String) -> String {
+        "\(siteURL)/rest/agile/1.0"
     }
 
     // MARK: - Current User
 
-    static func myself(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/myself"
+    static func myself(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/myself"
     }
 
     // MARK: - Projects
 
-    static func projects(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/project"
+    static func projects(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/project"
     }
 
-    static func recentProjects(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/project/recent"
+    static func recentProjects(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/project/recent"
     }
 
-    static func project(cloudId: String, key: String) -> String {
-        "\(platformBase(cloudId: cloudId))/project/\(key)"
+    static func project(siteURL: String, key: String) -> String {
+        "\(platformBase(siteURL: siteURL))/project/\(key)"
     }
 
     // MARK: - Issues
 
-    static func issue(cloudId: String, key: String) -> String {
-        "\(platformBase(cloudId: cloudId))/issue/\(key)"
+    static func issue(siteURL: String, key: String) -> String {
+        "\(platformBase(siteURL: siteURL))/issue/\(key)"
     }
 
-    static func createIssue(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/issue"
+    static func createIssue(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/issue"
     }
 
-    static func transitions(cloudId: String, issueKey: String) -> String {
-        "\(platformBase(cloudId: cloudId))/issue/\(issueKey)/transitions"
+    static func transitions(siteURL: String, issueKey: String) -> String {
+        "\(platformBase(siteURL: siteURL))/issue/\(issueKey)/transitions"
     }
 
-    static func comments(cloudId: String, issueKey: String) -> String {
-        "\(platformBase(cloudId: cloudId))/issue/\(issueKey)/comment"
+    static func comments(siteURL: String, issueKey: String) -> String {
+        "\(platformBase(siteURL: siteURL))/issue/\(issueKey)/comment"
     }
 
     // MARK: - Search
 
-    static func searchJQL(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/search/jql"
+    static func searchJQL(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/search/jql"
     }
 
     // MARK: - Reference Data
 
-    static func fields(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/field"
+    static func fields(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/field"
     }
 
-    static func assignableUsers(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/user/assignable/search"
+    static func assignableUsers(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/user/assignable/search"
     }
 
-    static func priorities(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/priority"
+    static func priorities(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/priority"
     }
 
-    static func statuses(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/status"
+    static func statuses(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/status"
     }
 
-    static func issueTypes(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/issuetype"
+    static func issueTypes(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/issuetype"
     }
 
-    static func labels(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/label"
+    static func labels(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/label"
     }
 
-    static func myPermissions(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/mypermissions"
+    static func myPermissions(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/mypermissions"
     }
 
     // MARK: - Webhooks
 
-    static func webhooks(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/webhook"
+    static func webhooks(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/webhook"
     }
 
-    static func refreshWebhooks(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/webhook/refresh"
+    static func refreshWebhooks(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/webhook/refresh"
     }
 
-    static func failedWebhooks(cloudId: String) -> String {
-        "\(platformBase(cloudId: cloudId))/webhook/failed"
+    static func failedWebhooks(siteURL: String) -> String {
+        "\(platformBase(siteURL: siteURL))/webhook/failed"
     }
 
     // MARK: - Agile (Boards)
 
-    static func boards(cloudId: String) -> String {
-        "\(agileBase(cloudId: cloudId))/board"
+    static func boards(siteURL: String) -> String {
+        "\(agileBase(siteURL: siteURL))/board"
     }
 
-    static func board(cloudId: String, boardId: Int) -> String {
-        "\(agileBase(cloudId: cloudId))/board/\(boardId)"
+    static func board(siteURL: String, boardId: Int) -> String {
+        "\(agileBase(siteURL: siteURL))/board/\(boardId)"
     }
 
-    static func boardConfiguration(cloudId: String, boardId: Int) -> String {
-        "\(agileBase(cloudId: cloudId))/board/\(boardId)/configuration"
+    static func boardConfiguration(siteURL: String, boardId: Int) -> String {
+        "\(agileBase(siteURL: siteURL))/board/\(boardId)/configuration"
     }
 
-    static func boardIssues(cloudId: String, boardId: Int) -> String {
-        "\(agileBase(cloudId: cloudId))/board/\(boardId)/issue"
+    static func boardIssues(siteURL: String, boardId: Int) -> String {
+        "\(agileBase(siteURL: siteURL))/board/\(boardId)/issue"
+    }
+
+    // MARK: - URL Parsing
+
+    /// Extract the base site URL from any Jira URL the user might paste.
+    /// e.g. "https://citydetect.atlassian.net/jira/software/c/projects/TECH/boards" → "https://citydetect.atlassian.net"
+    static func parseSiteURL(from input: String) -> String? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme,
+              let host = url.host else {
+            // Try prepending https:// if user just pasted "foo.atlassian.net"
+            if let url = URL(string: "https://\(trimmed)"),
+               let scheme = url.scheme,
+               let host = url.host,
+               host.contains(".") {
+                return "\(scheme)://\(host)"
+            }
+            return nil
+        }
+        return "\(scheme)://\(host)"
+    }
+
+    /// Extract a display name from a site URL.
+    /// e.g. "https://citydetect.atlassian.net" → "citydetect"
+    static func siteName(from siteURL: String) -> String {
+        guard let url = URL(string: siteURL), let host = url.host else {
+            return siteURL
+        }
+        return host.split(separator: ".").first.map(String.init) ?? host
     }
 
     // MARK: - Query Parameter Helpers

@@ -1,56 +1,42 @@
 import XCTest
 @testable import Kaiju
 
-final class OAuthFlowTests: XCTestCase {
+final class AuthFlowTests: XCTestCase {
 
-    func test_oauth_url_includes_all_required_params() throws {
-        let url = JiraEndpoints.authorizeURL(
-            clientId: "test-client-id",
-            redirectURI: "http://127.0.0.1:21456/oauth/callback",
-            state: "test-state-123"
-        )
-
-        XCTAssertNotNil(url)
-        let urlString = url!.absoluteString
-
-        XCTAssertTrue(urlString.contains("audience=api.atlassian.com"))
-        XCTAssertTrue(urlString.contains("client_id=test-client-id"))
-        XCTAssertTrue(urlString.contains("response_type=code"))
-        XCTAssertTrue(urlString.contains("state=test-state-123"))
-        XCTAssertTrue(urlString.contains("prompt=consent"))
-        XCTAssertTrue(urlString.contains("redirect_uri="))
-        XCTAssertTrue(urlString.contains("scope="))
-        // Verify all required scopes
-        XCTAssertTrue(urlString.contains("read%3Ajira-work") || urlString.contains("read:jira-work"))
-        XCTAssertTrue(urlString.contains("write%3Ajira-work") || urlString.contains("write:jira-work"))
-        XCTAssertTrue(urlString.contains("offline_access"))
-        XCTAssertTrue(urlString.contains("manage%3Ajira-webhook") || urlString.contains("manage:jira-webhook"))
+    func test_parse_site_url_from_full_link() {
+        let url = JiraEndpoints.parseSiteURL(from: "https://mysite.atlassian.net/jira/software/c/projects/KAI/boards")
+        XCTAssertEqual(url, "https://mysite.atlassian.net")
     }
 
-    func test_state_param_mismatch_rejects_callback() async throws {
-        // The callback server validates state parameter
-        // In production, mismatched state throws CallbackError.stateMismatch
-        // We verify the error type exists and is properly defined
-        let error = OAuthCallbackServer.CallbackError.stateMismatch(expected: "abc", received: "xyz")
-        switch error {
-        case .stateMismatch(let expected, let received):
-            XCTAssertEqual(expected, "abc")
-            XCTAssertEqual(received, "xyz")
-        default:
-            XCTFail("Expected stateMismatch error")
-        }
+    func test_parse_site_url_from_base_url() {
+        let url = JiraEndpoints.parseSiteURL(from: "https://mysite.atlassian.net")
+        XCTAssertEqual(url, "https://mysite.atlassian.net")
     }
 
-    func test_accessible_resources_model_decodes_correctly() throws {
-        let json = """
-        [{"id":"cloud-123","name":"mysite","url":"https://mysite.atlassian.net","scopes":["read:jira-work"],"avatarUrl":"https://example.com/avatar.png"}]
-        """
-        let data = json.data(using: .utf8)!
-        let resources = try JSONDecoder().decode([APIAccessibleResource].self, from: data)
+    func test_parse_site_url_from_bare_domain() {
+        let url = JiraEndpoints.parseSiteURL(from: "mysite.atlassian.net")
+        XCTAssertEqual(url, "https://mysite.atlassian.net")
+    }
 
-        XCTAssertEqual(resources.count, 1)
-        XCTAssertEqual(resources[0].id, "cloud-123")
-        XCTAssertEqual(resources[0].name, "mysite")
-        XCTAssertEqual(resources[0].url, "https://mysite.atlassian.net")
+    func test_parse_site_url_rejects_garbage() {
+        let url = JiraEndpoints.parseSiteURL(from: "not a url at all")
+        XCTAssertNil(url)
+    }
+
+    func test_site_name_from_url() {
+        let name = JiraEndpoints.siteName(from: "https://citydetect.atlassian.net")
+        XCTAssertEqual(name, "citydetect")
+    }
+
+    func test_basic_auth_header_encoding() {
+        let email = "user@example.com"
+        let token = "my-api-token"
+        let credentials = "\(email):\(token)"
+        let encoded = Data(credentials.utf8).base64EncodedString()
+
+        // Verify it produces valid base64
+        XCTAssertFalse(encoded.isEmpty)
+        let decoded = Data(base64Encoded: encoded).flatMap { String(data: $0, encoding: .utf8) }
+        XCTAssertEqual(decoded, "user@example.com:my-api-token")
     }
 }
