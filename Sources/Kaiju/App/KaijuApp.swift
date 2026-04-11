@@ -7,20 +7,19 @@ import AppKit
 struct KaijuApp: App {
     @State private var appState = AppState()
 
-    init() {
-        // SPM executables aren't proper .app bundles, so macOS doesn't
-        // automatically make them foreground apps. Without this, the
-        // window appears but can't receive keyboard input.
-        #if canImport(AppKit)
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        #endif
-    }
-
     var body: some Scene {
         WindowGroup {
             ContentView(appState: appState)
                 .frame(minWidth: 900, minHeight: 600)
+                .onAppear {
+                    // SPM executables aren't proper .app bundles, so macOS
+                    // doesn't automatically make them foreground apps. Without
+                    // this, the window appears but can't receive keyboard input.
+                    #if canImport(AppKit)
+                    NSApplication.shared.setActivationPolicy(.regular)
+                    NSApplication.shared.activate(ignoringOtherApps: true)
+                    #endif
+                }
         }
         .windowStyle(.titleBar)
         .commands {
