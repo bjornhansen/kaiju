@@ -81,7 +81,7 @@ final class AppState {
 
         // Initialize ViewModels
         self.projectListVM = ProjectListViewModel(store: store, syncEngine: syncEngine)
-        self.boardVM = BoardViewModel(store: store, syncEngine: syncEngine)
+        self.boardVM = BoardViewModel(store: store, syncEngine: syncEngine, apiClient: apiClient)
         self.issueDetailVM = IssueDetailViewModel(
             store: store,
             syncEngine: syncEngine,

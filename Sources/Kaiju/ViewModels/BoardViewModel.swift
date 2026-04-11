@@ -29,23 +29,45 @@ final class BoardViewModel {
 
     private let store: LocalStoreProtocol
     private let syncEngine: SyncEngine
+    private let apiClient: JiraAPIClientProtocol
     private let logger = KaijuLogger.ui
 
-    init(store: LocalStoreProtocol, syncEngine: SyncEngine) {
+    init(store: LocalStoreProtocol, syncEngine: SyncEngine, apiClient: JiraAPIClientProtocol? = nil) {
         self.store = store
         self.syncEngine = syncEngine
+        self.apiClient = apiClient ?? JiraAPIClient()
     }
 
-    /// Load boards for a project
+    /// Load boards for a project — fetches from API, saves locally, then selects the first one
     func loadBoards(projectKey: String) async {
+        isLoading = true
         do {
-            availableBoards = try await store.boards(forProject: projectKey)
+            // Fetch boards from Jira API
+            let apiBoards = try await apiClient.fetchBoards(projectKey: projectKey)
+            let records = apiBoards.map { board in
+                BoardRecord(id: board.id, name: board.name, type: board.type, projectKey: projectKey)
+            }
+            for record in records {
+                try await store.saveBoard(record)
+            }
+            availableBoards = records
+
+            // Auto-select the first board
             if let firstBoard = availableBoards.first {
                 selectedBoardId = firstBoard.id
             }
         } catch {
-            errorMessage = "Failed to load boards"
+            // Fall back to local store
+            do {
+                availableBoards = try await store.boards(forProject: projectKey)
+                if let firstBoard = availableBoards.first {
+                    selectedBoardId = firstBoard.id
+                }
+            } catch {
+                errorMessage = "Failed to load boards"
+            }
         }
+        isLoading = false
     }
 
     /// Load a specific board's columns and issues
