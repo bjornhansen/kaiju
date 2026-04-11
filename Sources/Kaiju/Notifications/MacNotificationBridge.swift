@@ -2,12 +2,22 @@ import Foundation
 import UserNotifications
 import os
 
-/// Bridge to macOS native notification center (UNUserNotificationCenter)
+/// Bridge to macOS native notification center (UNUserNotificationCenter).
+/// Gracefully no-ops when running without a proper app bundle (SPM executables).
 final class MacNotificationBridge: Sendable {
     private let logger = KaijuLogger.notification
 
+    /// Whether we're running in a proper app bundle that supports notifications
+    private var hasBundle: Bool {
+        Bundle.main.bundleIdentifier != nil
+    }
+
     /// Request notification permissions
     func requestPermission() async -> Bool {
+        guard hasBundle else {
+            logger.info("Skipping notification permissions — no app bundle")
+            return false
+        }
         do {
             let granted = try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound, .badge])
@@ -21,6 +31,8 @@ final class MacNotificationBridge: Sendable {
 
     /// Send a native macOS notification
     func sendNotification(title: String, body: String, identifier: String) async {
+        guard hasBundle else { return }
+
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -41,6 +53,7 @@ final class MacNotificationBridge: Sendable {
 
     /// Remove all delivered notifications
     func clearAll() {
+        guard hasBundle else { return }
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
     }
 }
