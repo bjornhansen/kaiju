@@ -10,6 +10,11 @@ struct AuthView: View {
     @State private var isSigningIn = false
     @State private var errorMessage: String?
 
+    private enum Field: Hashable {
+        case jiraURL, email, apiToken
+    }
+    @FocusState private var focusedField: Field?
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -30,38 +35,34 @@ struct AuthView: View {
             }
 
             // Login form
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Jira URL")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("https://yoursite.atlassian.net or paste any Jira link", text: $jiraURL)
-                        .textFieldStyle(.roundedBorder)
-                }
+            Form {
+                TextField("Jira URL", text: $jiraURL, prompt: Text("https://yoursite.atlassian.net or paste any Jira link"))
+                    .focused($focusedField, equals: .jiraURL)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Email")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("you@example.com", text: $email)
-                        .textFieldStyle(.roundedBorder)
-                        .textContentType(.emailAddress)
-                }
+                TextField("Email", text: $email, prompt: Text("you@example.com"))
+                    .focused($focusedField, equals: .email)
+                    .textContentType(.emailAddress)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("API Token")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Link("Create one", destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
-                            .font(.caption)
-                    }
-                    SecureField("Paste your API token", text: $apiToken)
-                        .textFieldStyle(.roundedBorder)
+                HStack {
+                    SecureField("API Token", text: $apiToken, prompt: Text("Paste your API token"))
+                        .focused($focusedField, equals: .apiToken)
+                    Link("Create one", destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                        .font(.callout)
                 }
             }
-            .frame(maxWidth: 360)
+            .formStyle(.grouped)
+            .frame(maxWidth: 420, maxHeight: 180)
+            .onSubmit {
+                // Tab through fields, then sign in
+                switch focusedField {
+                case .jiraURL: focusedField = .email
+                case .email: focusedField = .apiToken
+                case .apiToken, .none:
+                    if !jiraURL.isEmpty && !email.isEmpty && !apiToken.isEmpty {
+                        Task { await signIn() }
+                    }
+                }
+            }
 
             // Sign in button
             Button(action: {
@@ -91,8 +92,11 @@ struct AuthView: View {
 
             Spacer()
         }
-        .frame(minWidth: 500, minHeight: 450)
+        .frame(minWidth: 500, minHeight: 500)
         .padding()
+        .onAppear {
+            focusedField = .jiraURL
+        }
     }
 
     private func signIn() async {
@@ -102,7 +106,6 @@ struct AuthView: View {
         do {
             try await authManager.signIn(jiraURL: jiraURL, email: email, apiToken: apiToken)
         } catch {
-            // AuthManager already sets error state, but show it in the view too
             if case .error(let msg) = authManager.state {
                 errorMessage = msg
             } else {
