@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "Kaiju",
     platforms: [
-        .macOS(.v14)
+        .macOS("15.0")
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.24.0"),

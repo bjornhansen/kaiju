@@ -46,7 +46,31 @@ struct KaijuApp: App {
                 }
                 .keyboardShortcut("i", modifiers: .command)
             }
+
+            CommandGroup(after: .windowArrangement) {
+                OpenVibrancyPreviewButton()
+            }
         }
+
+        Window("Vibrancy Preview", id: "vibrancy-preview") {
+            VibrancyView()
+                .frame(minWidth: 1000, minHeight: 700)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1280, height: 800)
+    }
+}
+
+/// Menu-bar button that opens the Vibrancy design preview window. Wrapped in
+/// its own view so we can pull `openWindow` from the environment.
+private struct OpenVibrancyPreviewButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Vibrancy Preview") {
+            openWindow(id: "vibrancy-preview")
+        }
+        .keyboardShortcut("0", modifiers: [.command, .option])
     }
 }
 
