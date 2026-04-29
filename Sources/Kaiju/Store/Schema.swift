@@ -14,6 +14,7 @@ struct ProjectRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
     var projectType: String?
     var style: String?
     var updatedAt: String?
+    var archived: Bool?
 }
 
 struct BoardRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
@@ -58,6 +59,7 @@ struct IssueRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
     var sprintId: Int?
     var rank: String?
     var storyPoints: Double?
+    var dueDate: String?
     var createdAt: String?
     var updatedAt: String?
 }

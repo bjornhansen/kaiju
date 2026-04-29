@@ -82,7 +82,8 @@ actor SyncEngine {
                 avatarUrl: project.avatarUrls?["48x48"],
                 projectType: project.projectTypeKey,
                 style: project.style,
-                updatedAt: DateFormatters.nowISO8601()
+                updatedAt: DateFormatters.nowISO8601(),
+                archived: project.archived
             )
         }
         try await store.saveProjects(records)
@@ -354,6 +355,7 @@ actor SyncEngine {
             sprintId: issue.fields.sprint?.id,
             rank: nil,
             storyPoints: issue.fields.customfield_10016,
+            dueDate: issue.fields.duedate,
             createdAt: issue.fields.created,
             updatedAt: issue.fields.updated
         )

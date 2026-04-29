@@ -1,8 +1,12 @@
 import SwiftUI
 
-/// Right-side split panel showing full issue details
+/// Inspector panel showing full issue details. Vibrancy styling: header
+/// with key + close button, large title, properties block with hairline
+/// dividers, then body sections (description, attachments, comments).
 struct IssueDetailView: View {
     @Bindable var viewModel: IssueDetailViewModel
+    var onClose: () -> Void = {}
+
     @State private var newComment = ""
     @State private var isEditingSummary = false
     @State private var editedSummary = ""
@@ -12,39 +16,26 @@ struct IssueDetailView: View {
             if let issue = viewModel.issue {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        // Header: key, type, status
-                        issueHeader(issue)
-
-                        Divider()
-
-                        // Summary (editable)
+                        header(issue)
                         summarySection(issue)
+                        propertiesBlock(issue)
 
-                        // Description
                         if let description = viewModel.description {
                             descriptionSection(description)
                         }
 
-                        Divider()
-
-                        // Fields
-                        fieldsSection(issue)
-
-                        Divider()
-
-                        // Attachments
                         if !viewModel.attachments.isEmpty {
                             attachmentsSection
-                            Divider()
                         }
 
-                        // Comments
                         commentsSection
                     }
-                    .padding(20)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
                 }
+                .scrollContentBackground(.hidden)
             } else if viewModel.isLoading {
-                ProgressView("Loading issue...")
+                ProgressView("Loading issue…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView(
@@ -54,24 +45,30 @@ struct IssueDetailView: View {
                 )
             }
         }
-        .frame(minWidth: 360, idealWidth: 440)
+        .frame(minWidth: 320, idealWidth: 400)
     }
 
     // MARK: - Header
 
-    private func issueHeader(_ issue: IssueRecord) -> some View {
+    private func header(_ issue: IssueRecord) -> some View {
         HStack(spacing: 8) {
             IssueTypeIcon(typeName: issue.issueTypeName)
-
             Text(issue.key)
-                .font(.headline)
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
-
-            Spacer()
-
-            if let statusName = issue.statusName {
-                StatusBadge(name: statusName, category: issue.statusCategory)
+                .monospacedDigit()
+            Spacer(minLength: 0)
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        Circle().fill(Color.primary.opacity(0.05))
+                    )
             }
+            .buttonStyle(.plain)
+            .help("Close")
         }
     }
 
@@ -83,7 +80,7 @@ struct IssueDetailView: View {
                 HStack {
                     TextField("Summary", text: $editedSummary)
                         .textFieldStyle(.plain)
-                        .font(.title2)
+                        .font(.system(size: 18, weight: .semibold))
                         .onSubmit {
                             Task {
                                 await viewModel.updateSummary(editedSummary)
@@ -96,15 +93,17 @@ struct IssueDetailView: View {
                             isEditingSummary = false
                         }
                     }
+                    .controlSize(.small)
                     Button("Cancel") {
                         isEditingSummary = false
                     }
+                    .controlSize(.small)
                 }
             } else {
                 Text(issue.summary)
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 18, weight: .semibold))
                     .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
                     .onTapGesture(count: 2) {
                         editedSummary = issue.summary
                         isEditingSummary = true
@@ -113,103 +112,147 @@ struct IssueDetailView: View {
         }
     }
 
+    // MARK: - Properties
+
+    private func propertiesBlock(_ issue: IssueRecord) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider().opacity(0.6)
+
+            VStack(alignment: .leading, spacing: 0) {
+                IssueFieldRow(label: "Status") {
+                    if !viewModel.availableTransitions.isEmpty {
+                        Menu(issue.statusName ?? "Unknown") {
+                            ForEach(viewModel.availableTransitions, id: \.id) { transition in
+                                Button(transition.name) {
+                                    Task {
+                                        await viewModel.transitionIssue(
+                                            transitionId: transition.id,
+                                            toStatusName: transition.to.name,
+                                            toStatusId: transition.to.id
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        .controlSize(.small)
+                    } else {
+                        StatusBadge(name: issue.statusName ?? "Unknown", category: issue.statusCategory)
+                    }
+                }
+
+                if let priorityName = issue.priorityName {
+                    IssueFieldRow(label: "Priority") {
+                        HStack(spacing: 6) {
+                            PriorityBadge(priorityName: priorityName)
+                            Text(priorityName)
+                        }
+                    }
+                }
+
+                IssueFieldRow(label: "Assignee") {
+                    HStack(spacing: 6) {
+                        AvatarView(
+                            url: issue.assigneeAvatarUrl,
+                            displayName: issue.assigneeDisplayName,
+                            size: 18
+                        )
+                        Text(issue.assigneeDisplayName ?? "Unassigned")
+                            .foregroundStyle(issue.assigneeDisplayName != nil ? .primary : .secondary)
+                    }
+                }
+
+                IssueFieldRow(label: "Reporter") {
+                    Text(issue.reporterDisplayName ?? "Unknown")
+                }
+
+                if let labels = decodedLabels(issue), !labels.isEmpty {
+                    IssueFieldRow(label: "Labels") {
+                        FlowLayout(spacing: 4) {
+                            ForEach(labels, id: \.self) { label in
+                                Text(label)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(VibrancyTokens.accent)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1.5)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                            .fill(VibrancyTokens.accent.opacity(0.12))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                            .strokeBorder(VibrancyTokens.accent.opacity(0.25), lineWidth: 0.5)
+                                    )
+                            }
+                        }
+                    }
+                }
+
+                if let storyPoints = issue.storyPoints {
+                    IssueFieldRow(label: "Story Points") {
+                        Text("\(Int(storyPoints))")
+                    }
+                }
+
+                if let dueDate = issue.dueDate, !dueDate.isEmpty {
+                    IssueFieldRow(label: "Due") {
+                        Text(formattedDueDate(dueDate))
+                    }
+                }
+
+                if let created = issue.createdAt {
+                    IssueFieldRow(label: "Created") {
+                        Text(DateFormatters.parseJiraDate(created).map(DateFormatters.displayString) ?? created)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let updated = issue.updatedAt {
+                    IssueFieldRow(label: "Updated") {
+                        Text(DateFormatters.parseJiraDate(updated).map(DateFormatters.relativeString) ?? updated)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Divider().opacity(0.6)
+        }
+    }
+
+    private func decodedLabels(_ issue: IssueRecord) -> [String]? {
+        guard let labelsJSON = issue.labels else { return nil }
+        return try? JSONDecoder().decode([String].self, from: Data(labelsJSON.utf8))
+    }
+
+    private func formattedDueDate(_ raw: String) -> String {
+        let parsed = Self.dueDateInputFormatter.date(from: raw)
+            ?? DateFormatters.parseJiraDate(raw)
+        guard let date = parsed else { return raw }
+        return Self.dueDateDisplayFormatter.string(from: date)
+    }
+
+    private static let dueDateInputFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .iso8601)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static let dueDateDisplayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+
     // MARK: - Description
 
     private func descriptionSection(_ description: ADFDocument) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Description")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
+            sectionHeader("Description")
             ADFRendererView(document: description)
-        }
-    }
-
-    // MARK: - Fields
-
-    private func fieldsSection(_ issue: IssueRecord) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            IssueFieldRow(label: "Status", icon: "circle.fill") {
-                if !viewModel.availableTransitions.isEmpty {
-                    Menu(issue.statusName ?? "Unknown") {
-                        ForEach(viewModel.availableTransitions, id: \.id) { transition in
-                            Button(transition.name) {
-                                Task {
-                                    await viewModel.transitionIssue(
-                                        transitionId: transition.id,
-                                        toStatusName: transition.to.name,
-                                        toStatusId: transition.to.id
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    StatusBadge(name: issue.statusName ?? "Unknown", category: issue.statusCategory)
-                }
-            }
-
-            IssueFieldRow(label: "Assignee", icon: "person.fill") {
-                HStack(spacing: 6) {
-                    AvatarView(
-                        url: issue.assigneeAvatarUrl,
-                        displayName: issue.assigneeDisplayName,
-                        size: 20
-                    )
-                    Text(issue.assigneeDisplayName ?? "Unassigned")
-                        .foregroundStyle(issue.assigneeDisplayName != nil ? .primary : .secondary)
-                }
-            }
-
-            IssueFieldRow(label: "Reporter", icon: "person.fill") {
-                Text(issue.reporterDisplayName ?? "Unknown")
-            }
-
-            if let priorityName = issue.priorityName {
-                IssueFieldRow(label: "Priority", icon: "flag.fill") {
-                    HStack(spacing: 4) {
-                        PriorityBadge(priorityName: priorityName)
-                        Text(priorityName)
-                    }
-                }
-            }
-
-            if let labelsJSON = issue.labels,
-               let labels = try? JSONDecoder().decode([String].self, from: Data(labelsJSON.utf8)),
-               !labels.isEmpty {
-                IssueFieldRow(label: "Labels", icon: "tag.fill") {
-                    FlowLayout(spacing: 4) {
-                        ForEach(labels, id: \.self) { label in
-                            Text(label)
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.accentColor.opacity(0.1))
-                                .cornerRadius(4)
-                        }
-                    }
-                }
-            }
-
-            if let storyPoints = issue.storyPoints {
-                IssueFieldRow(label: "Story Points", icon: "number") {
-                    Text("\(Int(storyPoints))")
-                }
-            }
-
-            if let created = issue.createdAt {
-                IssueFieldRow(label: "Created", icon: "calendar") {
-                    Text(DateFormatters.parseJiraDate(created).map(DateFormatters.displayString) ?? created)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let updated = issue.updatedAt {
-                IssueFieldRow(label: "Updated", icon: "clock") {
-                    Text(DateFormatters.parseJiraDate(updated).map(DateFormatters.relativeString) ?? updated)
-                        .foregroundStyle(.secondary)
-                }
-            }
+                .font(.system(size: 13))
         }
     }
 
@@ -217,20 +260,20 @@ struct IssueDetailView: View {
 
     private var attachmentsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Attachments (\(viewModel.attachments.count))")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+            sectionHeader("Attachments (\(viewModel.attachments.count))")
 
             ForEach(viewModel.attachments, id: \.id) { attachment in
-                HStack {
+                HStack(spacing: 8) {
                     Image(systemName: iconForMimeType(attachment.mimeType))
+                        .font(.system(size: 14))
                         .foregroundStyle(.secondary)
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 1) {
                         Text(attachment.filename)
+                            .font(.system(size: 12))
                             .lineLimit(1)
                         if let size = attachment.size {
                             Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
-                                .font(.caption)
+                                .font(.system(size: 10))
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -238,12 +281,19 @@ struct IssueDetailView: View {
                     if let urlString = attachment.contentUrl, let url = URL(string: urlString) {
                         Link(destination: url) {
                             Image(systemName: "arrow.down.circle")
+                                .font(.system(size: 14))
                         }
                     }
                 }
-                .padding(6)
-                .background(Color(.controlBackgroundColor))
-                .cornerRadius(6)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(.regularMaterial)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+                )
             }
         }
     }
@@ -252,32 +302,54 @@ struct IssueDetailView: View {
 
     private var commentsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Comments (\(viewModel.comments.count))")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+            sectionHeader("Comments (\(viewModel.comments.count))")
 
-            // Add comment
             HStack(alignment: .top, spacing: 8) {
-                TextField("Add a comment...", text: $newComment, axis: .vertical)
+                TextField("Add a comment…", text: $newComment, axis: .vertical)
                     .textFieldStyle(.plain)
+                    .font(.system(size: 12))
                     .padding(8)
-                    .background(Color(.controlBackgroundColor))
-                    .cornerRadius(6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(.regularMaterial)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+                    )
                     .lineLimit(1...5)
 
-                Button("Send") {
+                Button {
                     let text = newComment
                     newComment = ""
                     Task { await viewModel.addComment(text: text) }
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(VibrancyTokens.accent)
+                        )
                 }
+                .buttonStyle(.plain)
                 .disabled(newComment.trimmingCharacters(in: .whitespaces).isEmpty)
             }
 
-            // Comment list
             ForEach(viewModel.comments, id: \.id) { comment in
                 CommentRowView(comment: comment)
             }
         }
+    }
+
+    // MARK: - Helpers
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(.secondary)
     }
 
     private func iconForMimeType(_ mimeType: String?) -> String {

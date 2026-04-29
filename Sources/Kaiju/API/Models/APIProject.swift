@@ -8,4 +8,5 @@ struct APIProject: Codable, Sendable {
     let projectTypeKey: String?
     let style: String?
     let issueTypes: [APIIssueType]?
+    let archived: Bool?
 }

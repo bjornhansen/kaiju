@@ -32,7 +32,7 @@ final class MockJiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
             summary: "Test", description: nil, status: nil, priority: nil,
             issuetype: nil, assignee: nil, reporter: nil, labels: nil,
             comment: nil, attachment: nil, issuelinks: nil, subtasks: nil,
-            created: nil, updated: nil, fixVersions: nil, components: nil,
+            created: nil, updated: nil, duedate: nil, fixVersions: nil, components: nil,
             customfield_10016: nil, sprint: nil
         ))
     }
@@ -41,7 +41,7 @@ final class MockJiraAPIClient: JiraAPIClientProtocol, @unchecked Sendable {
             summary: "New", description: nil, status: nil, priority: nil,
             issuetype: nil, assignee: nil, reporter: nil, labels: nil,
             comment: nil, attachment: nil, issuelinks: nil, subtasks: nil,
-            created: nil, updated: nil, fixVersions: nil, components: nil,
+            created: nil, updated: nil, duedate: nil, fixVersions: nil, components: nil,
             customfield_10016: nil, sprint: nil
         ))
     }

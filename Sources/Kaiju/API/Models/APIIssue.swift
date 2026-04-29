@@ -22,6 +22,7 @@ struct APIIssueFields: Codable, Sendable {
     let subtasks: [APIIssueSummary]?
     let created: String?
     let updated: String?
+    let duedate: String?
     let fixVersions: [APIVersion]?
     let components: [APIComponent]?
     let customfield_10016: Double?  // Story points (typical)

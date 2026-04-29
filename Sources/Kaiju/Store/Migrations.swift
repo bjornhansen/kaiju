@@ -160,6 +160,15 @@ enum DatabaseMigrator {
             }
         }
 
+        migrator.registerMigration("v2_archived_and_duedate") { db in
+            try db.alter(table: "projects") { t in
+                t.add(column: "archived", .boolean).defaults(to: false)
+            }
+            try db.alter(table: "issues") { t in
+                t.add(column: "dueDate", .text)
+            }
+        }
+
         return migrator
     }
 }

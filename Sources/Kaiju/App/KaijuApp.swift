@@ -21,7 +21,7 @@ struct KaijuApp: App {
                     #endif
                 }
         }
-        .windowStyle(.titleBar)
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Issue") {
@@ -40,11 +40,6 @@ struct KaijuApp: App {
                     appState.showSearch.toggle()
                 }
                 .keyboardShortcut("k", modifiers: .command)
-
-                Button("Notifications") {
-                    // Toggle notification inbox
-                }
-                .keyboardShortcut("i", modifiers: .command)
             }
 
             CommandGroup(after: .windowArrangement) {
@@ -77,6 +72,7 @@ private struct OpenVibrancyPreviewButton: View {
 /// Main content view that switches between auth and main app
 struct ContentView: View {
     @Bindable var appState: AppState
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Group {
@@ -100,63 +96,57 @@ struct ContentView: View {
         .task {
             await appState.authManager.restoreSession()
         }
+        .containerBackground(for: .window) {
+            VibrancyTokens.wallpaper(for: colorScheme)
+        }
     }
 }
 
-/// Main app layout with sidebar, board, and detail panel
+/// Main app layout — Vibrancy variation: floating inset sidebar + board, with
+/// an `.inspector` panel that slides in from the right when an issue is selected.
 struct MainAppView: View {
     @Bindable var appState: AppState
     let siteName: String
+
+    private var inspecting: Binding<Bool> {
+        Binding(
+            get: { appState.selectedIssueKey != nil },
+            set: { newValue in
+                if !newValue { appState.selectedIssueKey = nil }
+            }
+        )
+    }
 
     var body: some View {
         NavigationSplitView {
             ProjectSidebarView(
                 viewModel: appState.projectListVM,
-                notificationViewModel: appState.notificationInboxVM
+                notificationViewModel: appState.notificationInboxVM,
+                siteName: siteName,
+                onSignOut: signOut
             )
-            .navigationSplitViewColumnWidth(min: 220, ideal: 260)
-        } content: {
+            .navigationSplitViewColumnWidth(min: 220, ideal: 232, max: 280)
+            .toolbar(removing: .sidebarToggle)
+            .scrollContentBackground(.hidden)
+        } detail: {
             BoardView(
                 viewModel: appState.boardVM,
                 onIssueSelected: { key in
                     appState.selectedIssueKey = key
-                }
+                },
+                onCreateIssue: { appState.showCreateIssue = true },
+                onSearchToggle: { appState.showSearch.toggle() }
             )
-            .navigationSplitViewColumnWidth(min: 500, ideal: 700)
-        } detail: {
-            IssueDetailView(viewModel: appState.issueDetailVM)
-        }
-        .navigationTitle("\(siteName) — Kaiju")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: { appState.showSearch.toggle() }) {
-                    Image(systemName: "magnifyingglass")
-                }
-                .keyboardShortcut("k", modifiers: .command)
-                .help("Search (Cmd+K)")
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: { appState.showCreateIssue = true }) {
-                    Image(systemName: "plus")
-                }
-                .keyboardShortcut("n", modifiers: .command)
-                .help("New Issue (Cmd+N)")
-            }
-
-            ToolbarItem(placement: .automatic) {
-                Menu {
-                    Button("Sign Out") {
-                        Task {
-                            await appState.stopServices()
-                            try? await appState.authManager.signOut()
-                        }
-                    }
-                } label: {
-                    Image(systemName: "person.circle")
-                }
+            .scrollContentBackground(.hidden)
+            .inspector(isPresented: inspecting) {
+                IssueDetailView(
+                    viewModel: appState.issueDetailVM,
+                    onClose: { appState.selectedIssueKey = nil }
+                )
+                .inspectorColumnWidth(min: 320, ideal: 400, max: 600)
             }
         }
+        .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $appState.showCreateIssue) {
             CreateIssueView(
                 viewModel: appState.createIssueVM,
@@ -177,6 +167,13 @@ struct MainAppView: View {
             if let key = newKey {
                 Task { await appState.boardVM.loadBoards(projectKey: key) }
             }
+        }
+    }
+
+    private func signOut() {
+        Task {
+            await appState.stopServices()
+            try? await appState.authManager.signOut()
         }
     }
 }

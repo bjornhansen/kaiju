@@ -41,13 +41,12 @@ final class ProjectListViewModel {
         isLoading = false
     }
 
-    /// Filter projects by search text
+    /// Filter projects by search text. Archived projects are always excluded.
     func filteredProjects(searchText: String) -> [ProjectRecord] {
-        if searchText.isEmpty {
-            return projects
-        }
+        let active = projects.filter { $0.archived != true }
+        guard !searchText.isEmpty else { return active }
         let lower = searchText.lowercased()
-        return projects.filter {
+        return active.filter {
             $0.name.lowercased().contains(lower) || $0.key.lowercased().contains(lower)
         }
     }
